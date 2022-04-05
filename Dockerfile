@@ -141,7 +141,14 @@ RUN set -x && \
     -DUSE_PANGOLIN_VIEWER=ON \
     -DUSE_SOCKET_PUBLISHER=OFF \
     -DUSE_STACK_TRACE_LOGGER=ON"
+    
+# extras
+ENV VOCAB_FILE_PATH=/orb_vocab.fbow
+RUN set -x && wget -q https://github.com/stella-cv/FBoW_orb_vocab/blob/main/orb_vocab.fbow?raw=true -O ${VOCAB_FILE_PATH}
 
+ENV CONFIG_PATH=/ros2_ws/src/stella_vslam_ros/config
+
+# env
 RUN set -x && \
   sh -c "echo '#'\!'/bin/bash\nset -e\nsource /opt/ros/${ROS_DISTRO}/setup.bash\nsource /ros2_ws/install/setup.bash\nexec \"\$@\"' > /ros_entrypoint.sh" && \
   chmod u+x /ros_entrypoint.sh
