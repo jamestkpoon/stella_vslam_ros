@@ -23,6 +23,10 @@
 #include <sensor_msgs/msg/image.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 
+#include <nav2_msgs/srv/load_map.hpp>
+#include <nav2_msgs/srv/save_map.hpp>
+#include <std_srvs/srv/set_bool.hpp>
+
 namespace stella_vslam_ros {
 class system {
 public:
@@ -49,6 +53,12 @@ public:
 
 private:
     void init_pose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg);
+    void save_map_svc(const std::shared_ptr<nav2_msgs::srv::SaveMap::Request> request,
+        std::shared_ptr<nav2_msgs::srv::SaveMap::Response> response);
+    void load_map_svc(const std::shared_ptr<nav2_msgs::srv::LoadMap::Request> request,
+        std::shared_ptr<nav2_msgs::srv::LoadMap::Response> response);
+    void enable_mapping_svc(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+        std::shared_ptr<std_srvs::srv::SetBool::Response> response);
 };
 
 class mono : public system {

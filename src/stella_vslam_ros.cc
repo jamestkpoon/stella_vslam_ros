@@ -158,6 +158,33 @@ void system::init_pose_callback(
     }
 }
 
+void system::save_map_svc(const std::shared_ptr<nav2_msgs::srv::SaveMap::Request> request,
+    std::shared_ptr<nav2_msgs::srv::SaveMap::Response> response)
+{
+    SLAM_.save_map_database(request->map_url);
+}
+
+void system::load_map_svc(const std::shared_ptr<nav2_msgs::srv::LoadMap::Request> request,
+    std::shared_ptr<nav2_msgs::srv::LoadMap::Response> response)
+{
+    SLAM_.load_map_database(request->map_url);
+}
+
+void system::enable_mapping_svc(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+    std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+{
+    if (request->data) {
+        SLAM_.enable_mapping_module();
+        response->message = "Mapping module enabled";
+    }
+    else {
+        SLAM_.disable_mapping_module();
+        response->message = "Mapping module disabled";
+    }
+
+    response->success = true;
+}
+
 mono::mono(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& vocab_file_path, const std::string& mask_img_path)
     : system(cfg, vocab_file_path, mask_img_path) {
     sub_ = image_transport::create_subscription(

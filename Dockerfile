@@ -134,6 +134,13 @@ RUN set -x && \
 WORKDIR /ros2_ws
 COPY . /ros2_ws/src/stella_vslam_ros
 
+# nav2_msgs
+RUN set -x && \
+  git clone https://github.com/ros-planning/navigation2.git /ros2_ws/src/navigation2 && \
+  mv /ros2_ws/src/navigation2/nav2_msgs /ros2_ws/src/navigation2/nav2_common /ros2_ws/src/ && \
+  rm -rf /ros2_ws/src/navigation2
+
+# colcon build
 RUN set -x && \
   : "build ROS2 packages" && \
   bash -c "source /opt/ros/${ROS_DISTRO}/setup.bash; \
@@ -142,11 +149,14 @@ RUN set -x && \
     -DUSE_SOCKET_PUBLISHER=OFF \
     -DUSE_STACK_TRACE_LOGGER=ON"
     
-# extras
+RUN rm -rf /ros2_ws/src/*
+
+# convenient vars
 ENV VOCAB_FILE_PATH=/orb_vocab.fbow
 RUN set -x && wget -q https://github.com/stella-cv/FBoW_orb_vocab/blob/main/orb_vocab.fbow?raw=true -O ${VOCAB_FILE_PATH}
 
-ENV CONFIG_PATH=/ros2_ws/src/stella_vslam_ros/config
+ENV CONFIG_PATH=/vslam_config
+COPY ./config ${CONFIG_PATH}
 
 # env
 RUN set -x && \
