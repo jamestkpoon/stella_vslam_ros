@@ -10,14 +10,43 @@
 #include <opencv2/imgcodecs.hpp>
 #include <Eigen/Geometry>
 
+
+#define VOCAB_PARAM "vocab"
+#define RECTIFY_STEREO_PARAM "rectify_stereo"
+#define MASK_PARAM "mask"
+
+
 namespace stella_vslam_ros {
 system::system(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& vocab_file_path, const std::string& mask_img_path)
-    : SLAM_(cfg, vocab_file_path), cfg_(cfg), node_(std::make_shared<rclcpp::Node>("run_slam")), custom_qos_(rmw_qos_profile_default),
-      mask_(mask_img_path.empty() ? cv::Mat{} : cv::imread(mask_img_path, cv::IMREAD_GRAYSCALE)),
-      pose_pub_(node_->create_publisher<nav_msgs::msg::Odometry>("~/camera_pose", 1)),
-      map_to_odom_broadcaster_(std::make_shared<tf2_ros::TransformBroadcaster>(node_)),
-      tf_(std::make_unique<tf2_ros::Buffer>(node_->get_clock())),
-      transform_listener_(std::make_shared<tf2_ros::TransformListener>(*tf_)) {
+    : node_(std::make_shared<rclcpp::Node>("run_slam"))
+{
+    init(cfg, vocab_file_path, mask_img_path);
+}
+
+system::system(const std::shared_ptr<stella_vslam::config>& cfg, std::shared_ptr<rclcpp::Node>& node) : node_(node)
+{
+    init(cfg,
+        node_->declare_parameter<std::string>(VOCAB_PARAM, ""),
+        node_->declare_parameter<std::string>(MASK_PARAM, "")
+    );
+
+    initialize_subs();
+}
+
+void system::initialize_subs() {}
+
+void system::init(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& vocab_file_path, const std::string& mask_img_path)
+{
+    cfg_ = cfg;
+    SLAM_ = std::make_shared<stella_vslam::system>(cfg_, vocab_file_path);
+    mask_ = mask_img_path.empty() ? cv::Mat{} : cv::imread(mask_img_path, cv::IMREAD_GRAYSCALE);
+
+    pose_pub_ = node_->create_publisher<nav_msgs::msg::Odometry>("~/camera_pose", 1);
+    map_to_odom_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(node_);
+    tf_ = std::make_unique<tf2_ros::Buffer>(node_->get_clock());
+    transform_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_);
+
+    custom_qos_ = rmw_qos_profile_default;
     custom_qos_.depth = 1;
     exec_.add_node(node_);
     init_pose_sub_ = node_->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
@@ -153,7 +182,7 @@ void system::init_pose_callback(
                                       .matrix();
 
     const Eigen::Vector3d normal_vector = (Eigen::Vector3d() << 0., 1., 0.).finished();
-    if (!SLAM_.relocalize_by_pose_2d(cam_pose_cv, normal_vector)) {
+    if (!SLAM_->relocalize_by_pose_2d(cam_pose_cv, normal_vector)) {
         RCLCPP_ERROR(node_->get_logger(), "Can not set initial pose");
     }
 }
@@ -161,35 +190,48 @@ void system::init_pose_callback(
 void system::save_map_svc(const std::shared_ptr<nav2_msgs::srv::SaveMap::Request> request,
     std::shared_ptr<nav2_msgs::srv::SaveMap::Response> response)
 {
-    SLAM_.save_map_database(request->map_url);
+    SLAM_->save_map_database(request->map_url);
 }
 
 void system::load_map_svc(const std::shared_ptr<nav2_msgs::srv::LoadMap::Request> request,
     std::shared_ptr<nav2_msgs::srv::LoadMap::Response> response)
 {
-    SLAM_.load_map_database(request->map_url);
+    SLAM_->load_map_database(request->map_url);
 }
 
 void system::enable_mapping_svc(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
     std::shared_ptr<std_srvs::srv::SetBool::Response> response)
 {
     if (request->data) {
-        SLAM_.enable_mapping_module();
+        SLAM_->enable_mapping_module();
         response->message = "Mapping module enabled";
     }
     else {
-        SLAM_.disable_mapping_module();
+        SLAM_->disable_mapping_module();
         response->message = "Mapping module disabled";
     }
 
     response->success = true;
 }
 
+
 mono::mono(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& vocab_file_path, const std::string& mask_img_path)
     : system(cfg, vocab_file_path, mask_img_path) {
+    initialize_subs();
+}
+
+mono::mono(const std::shared_ptr<stella_vslam::config>& cfg, std::shared_ptr<rclcpp::Node>& node)
+    : system(cfg, node)
+{
+
+}
+
+void mono::initialize_subs()
+{
     sub_ = image_transport::create_subscription(
         node_.get(), "camera/image_raw", [this](const sensor_msgs::msg::Image::ConstSharedPtr& msg) { callback(msg); }, "raw", custom_qos_);
 }
+
 void mono::callback(const sensor_msgs::msg::Image::ConstSharedPtr& msg) {
     if (camera_optical_frame_.empty()) {
         camera_optical_frame_ = msg->header.frame_id;
@@ -198,7 +240,7 @@ void mono::callback(const sensor_msgs::msg::Image::ConstSharedPtr& msg) {
     const double timestamp = tp_1.seconds();
 
     // input the current frame and estimate the camera pose
-    auto cam_pose_wc = SLAM_.feed_monocular_frame(cv_bridge::toCvShare(msg)->image, timestamp, mask_);
+    auto cam_pose_wc = SLAM_->feed_monocular_frame(cv_bridge::toCvShare(msg)->image, timestamp, mask_);
 
     const rclcpp::Time tp_2 = node_->now();
     const double track_time = (tp_2 - tp_1).seconds();
@@ -211,20 +253,35 @@ void mono::callback(const sensor_msgs::msg::Image::ConstSharedPtr& msg) {
     }
 }
 
+
 stereo::stereo(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& vocab_file_path, const std::string& mask_img_path,
                const bool rectify)
-    : system(cfg, vocab_file_path, mask_img_path),
-      rectifier_(rectify ? std::make_shared<stella_vslam::util::stereo_rectifier>(cfg) : nullptr),
-      left_sf_(node_, "camera/left/image_raw"),
-      right_sf_(node_, "camera/right/image_raw") {
+    : system(cfg, vocab_file_path, mask_img_path)
+{
+    rectify_ = rectify;
+    initialize_subs();
+}
+
+stereo::stereo(const std::shared_ptr<stella_vslam::config>& cfg, std::shared_ptr<rclcpp::Node>& node)
+    : system(cfg, node)
+{
+    rectify_ = node_->declare_parameter<bool>(RECTIFY_STEREO_PARAM, false);
+}
+
+void stereo::initialize_subs()
+{
+    rectifier_ = rectify_ ? std::make_shared<stella_vslam::util::stereo_rectifier>(cfg_) : nullptr;
+    left_sf_ = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(node_, "camera/left/image_raw");
+    right_sf_ = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(node_, "camera/right/image_raw");
+
     use_exact_time_ = false;
     use_exact_time_ = node_->declare_parameter("use_exact_time", use_exact_time_);
     if (use_exact_time_) {
-        exact_time_sync_ = std::make_shared<ExactTimeSyncPolicy::Sync>(2, left_sf_, right_sf_);
+        exact_time_sync_ = std::make_shared<ExactTimeSyncPolicy::Sync>(2, *left_sf_.get(), *right_sf_.get());
         exact_time_sync_->registerCallback(&stereo::callback, this);
     }
     else {
-        approx_time_sync_ = std::make_shared<ApproximateTimeSyncPolicy::Sync>(10, left_sf_, right_sf_);
+        approx_time_sync_ = std::make_shared<ApproximateTimeSyncPolicy::Sync>(10, *left_sf_.get(), *right_sf_.get());
         approx_time_sync_->registerCallback(&stereo::callback, this);
     }
 }
@@ -247,7 +304,7 @@ void stereo::callback(const sensor_msgs::msg::Image::ConstSharedPtr& left, const
     const double timestamp = tp_1.seconds();
 
     // input the current frame and estimate the camera pose
-    auto cam_pose_wc = SLAM_.feed_stereo_frame(leftcv, rightcv, timestamp, mask_);
+    auto cam_pose_wc = SLAM_->feed_stereo_frame(leftcv, rightcv, timestamp, mask_);
 
     const rclcpp::Time tp_2 = node_->now();
     const double track_time = (tp_2 - tp_1).seconds();
@@ -260,18 +317,32 @@ void stereo::callback(const sensor_msgs::msg::Image::ConstSharedPtr& left, const
     }
 }
 
+
 rgbd::rgbd(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& vocab_file_path, const std::string& mask_img_path)
-    : system(cfg, vocab_file_path, mask_img_path),
-      color_sf_(node_, "camera/color/image_raw"),
-      depth_sf_(node_, "camera/depth/image_raw") {
+    : system(cfg, vocab_file_path, mask_img_path)
+{
+    initialize_subs();
+}
+
+rgbd::rgbd(const std::shared_ptr<stella_vslam::config>& cfg, std::shared_ptr<rclcpp::Node>& node)
+    : system(cfg, node)
+{
+
+}
+
+void rgbd::initialize_subs()
+{
+    color_sf_ = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(node_, "camera/color/image_raw");
+    depth_sf_ = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(node_, "camera/depth/image_raw");
+
     use_exact_time_ = false;
     use_exact_time_ = node_->declare_parameter("use_exact_time", use_exact_time_);
     if (use_exact_time_) {
-        exact_time_sync_ = std::make_shared<ExactTimeSyncPolicy::Sync>(2, color_sf_, depth_sf_);
+        exact_time_sync_ = std::make_shared<ExactTimeSyncPolicy::Sync>(2, *color_sf_.get(), *depth_sf_.get());
         exact_time_sync_->registerCallback(&rgbd::callback, this);
     }
     else {
-        approx_time_sync_ = std::make_shared<ApproximateTimeSyncPolicy::Sync>(10, color_sf_, depth_sf_);
+        approx_time_sync_ = std::make_shared<ApproximateTimeSyncPolicy::Sync>(10, *color_sf_.get(), *depth_sf_.get());
         approx_time_sync_->registerCallback(&rgbd::callback, this);
     }
 }
@@ -293,7 +364,7 @@ void rgbd::callback(const sensor_msgs::msg::Image::ConstSharedPtr& color, const 
     const double timestamp = tp_1.seconds();
 
     // input the current frame and estimate the camera pose
-    auto cam_pose_wc = SLAM_.feed_RGBD_frame(colorcv, depthcv, timestamp, mask_);
+    auto cam_pose_wc = SLAM_->feed_RGBD_frame(colorcv, depthcv, timestamp, mask_);
 
     const rclcpp::Time tp_2 = node_->now();
     const double track_time = (tp_2 - tp_1).seconds();

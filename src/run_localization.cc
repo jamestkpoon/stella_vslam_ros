@@ -45,23 +45,23 @@ void localization(const std::shared_ptr<stella_vslam::config>& cfg, const std::s
 
     auto& SLAM = ros->SLAM_;
     // load the prebuilt map
-    SLAM.load_map_database(map_db_path);
+    SLAM->load_map_database(map_db_path);
     // startup the SLAM process (it does not need initialization of a map)
-    SLAM.startup(false);
+    SLAM->startup(false);
     // select to activate the mapping module or not
     if (mapping) {
-        SLAM.enable_mapping_module();
+        SLAM->enable_mapping_module();
     }
     else {
-        SLAM.disable_mapping_module();
+        SLAM->disable_mapping_module();
     }
 
     // create a viewer object
     // and pass the frame_publisher and the map_publisher
 #ifdef USE_PANGOLIN_VIEWER
-    pangolin_viewer::viewer viewer(stella_vslam::util::yaml_optional_ref(cfg->yaml_node_, "PangolinViewer"), &SLAM, SLAM.get_frame_publisher(), SLAM.get_map_publisher());
+    pangolin_viewer::viewer viewer(stella_vslam::util::yaml_optional_ref(cfg->yaml_node_, "PangolinViewer"), SLAM.get(), SLAM->get_frame_publisher(), SLAM->get_map_publisher());
 #elif USE_SOCKET_PUBLISHER
-    socket_publisher::publisher publisher(stella_vslam::util::yaml_optional_ref(cfg->yaml_node_, "SocketPublisher"), &SLAM, SLAM.get_frame_publisher(), SLAM.get_map_publisher());
+    socket_publisher::publisher publisher(stella_vslam::util::yaml_optional_ref(cfg->yaml_node_, "SocketPublisher"), SLAM.get(), SLAM->get_frame_publisher(), SLAM->get_map_publisher());
 #endif
 
     // TODO: Pangolin needs to run in the main thread on OSX
@@ -69,9 +69,9 @@ void localization(const std::shared_ptr<stella_vslam::config>& cfg, const std::s
 #ifdef USE_PANGOLIN_VIEWER
     std::thread thread([&]() {
         viewer.run();
-        if (SLAM.terminate_is_requested()) {
+        if (SLAM->terminate_is_requested()) {
             // wait until the loop BA is finished
-            while (SLAM.loop_BA_is_running()) {
+            while (SLAM->loop_BA_is_running()) {
                 std::this_thread::sleep_for(std::chrono::microseconds(5000));
             }
             rclcpp::shutdown();
@@ -80,9 +80,9 @@ void localization(const std::shared_ptr<stella_vslam::config>& cfg, const std::s
 #elif USE_SOCKET_PUBLISHER
     std::thread thread([&]() {
         publisher.run();
-        if (SLAM.terminate_is_requested()) {
+        if (SLAM->terminate_is_requested()) {
             // wait until the loop BA is finished
-            while (SLAM.loop_BA_is_running()) {
+            while (SLAM->loop_BA_is_running()) {
                 std::this_thread::sleep_for(std::chrono::microseconds(5000));
             }
             rclcpp::shutdown();
@@ -106,10 +106,10 @@ void localization(const std::shared_ptr<stella_vslam::config>& cfg, const std::s
 #endif
 
     // shutdown the SLAM process
-    SLAM.shutdown();
+    SLAM->shutdown();
 
     if (mapping) {
-        SLAM.save_map_database(map_db_path);
+        SLAM->save_map_database(map_db_path);
     }
 
     auto& track_times = ros->track_times_;
@@ -181,7 +181,7 @@ int main(int argc, char* argv[]) {
     }
 
 #ifdef USE_GOOGLE_PERFTOOLS
-    ProfilerStart("slam.prof");
+    ProfilerStart("SLAM->prof");
 #endif
 
     localization(cfg, vocab_file_path->value(), mask_img_path->value(), map_db_path->value(), mapping->is_set(), rectify->value());

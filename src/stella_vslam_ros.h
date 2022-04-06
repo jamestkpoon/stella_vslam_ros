@@ -31,9 +31,10 @@ namespace stella_vslam_ros {
 class system {
 public:
     system(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& vocab_file_path, const std::string& mask_img_path);
+    system(const std::shared_ptr<stella_vslam::config>& cfg, std::shared_ptr<rclcpp::Node>& node);
     void publish_pose(const Eigen::Matrix4d& cam_pose_wc, const rclcpp::Time& stamp);
     void setParams();
-    stella_vslam::system SLAM_;
+    std::shared_ptr<stella_vslam::system> SLAM_;
     std::shared_ptr<stella_vslam::config> cfg_;
     std::shared_ptr<rclcpp::Node> node_;
     rclcpp::executors::SingleThreadedExecutor exec_;
@@ -59,42 +60,60 @@ private:
         std::shared_ptr<nav2_msgs::srv::LoadMap::Response> response);
     void enable_mapping_svc(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
         std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+
+    void init(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& vocab_file_path, const std::string& mask_img_path);
+
+protected:
+    virtual void initialize_subs();
 };
 
 class mono : public system {
 public:
     mono(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& vocab_file_path, const std::string& mask_img_path);
+    mono(const std::shared_ptr<stella_vslam::config>& cfg, std::shared_ptr<rclcpp::Node>& node);
     void callback(const sensor_msgs::msg::Image::ConstSharedPtr& msg);
 
     image_transport::Subscriber sub_;
+
+private:
+    void initialize_subs() override;
 };
 
 class stereo : public system {
 public:
     stereo(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& vocab_file_path, const std::string& mask_img_path,
            const bool rectify);
+    stereo(const std::shared_ptr<stella_vslam::config>& cfg, std::shared_ptr<rclcpp::Node>& node);
     void callback(const sensor_msgs::msg::Image::ConstSharedPtr& left, const sensor_msgs::msg::Image::ConstSharedPtr& right);
 
     std::shared_ptr<stella_vslam::util::stereo_rectifier> rectifier_;
-    message_filters::Subscriber<sensor_msgs::msg::Image> left_sf_, right_sf_;
+    std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>> left_sf_, right_sf_;
     using ApproximateTimeSyncPolicy = message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image, sensor_msgs::msg::Image>;
     std::shared_ptr<ApproximateTimeSyncPolicy::Sync> approx_time_sync_;
     using ExactTimeSyncPolicy = message_filters::sync_policies::ExactTime<sensor_msgs::msg::Image, sensor_msgs::msg::Image>;
     std::shared_ptr<ExactTimeSyncPolicy::Sync> exact_time_sync_;
     bool use_exact_time_;
+
+private:
+    void initialize_subs() override;
+    bool rectify_;
 };
 
 class rgbd : public system {
 public:
     rgbd(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& vocab_file_path, const std::string& mask_img_path);
+    rgbd(const std::shared_ptr<stella_vslam::config>& cfg, std::shared_ptr<rclcpp::Node>& node);
     void callback(const sensor_msgs::msg::Image::ConstSharedPtr& color, const sensor_msgs::msg::Image::ConstSharedPtr& depth);
 
-    message_filters::Subscriber<sensor_msgs::msg::Image> color_sf_, depth_sf_;
+    std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>> color_sf_, depth_sf_;
     using ApproximateTimeSyncPolicy = message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image, sensor_msgs::msg::Image>;
     std::shared_ptr<ApproximateTimeSyncPolicy::Sync> approx_time_sync_;
     using ExactTimeSyncPolicy = message_filters::sync_policies::ExactTime<sensor_msgs::msg::Image, sensor_msgs::msg::Image>;
     std::shared_ptr<ExactTimeSyncPolicy::Sync> exact_time_sync_;
     bool use_exact_time_;
+
+private:
+    void initialize_subs() override;
 };
 
 } // namespace stella_vslam_ros

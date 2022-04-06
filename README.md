@@ -11,13 +11,14 @@
     ```
     docker run -it -m 16g -v /tmp/.X11-unix/:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY vslam:0.0.1
     ```
-    To bind mound this repository, include ```-v $(pwd):/ros2_ws/src/vslam```
+    - to bind mount this repository, include ```-v $(pwd):/ros2_ws/src/stella_vslam_ros```
+    - to re-build with this bind mount: ```colcon build --packages-select stella_vslam_ros```
 1. ZED2 stereo:
     ```
     ros2 run stella_vslam_ros run_slam -v $VOCAB_FILE_PATH -c $CONFIG_PATH/zed2.yaml --ros-args --remap camera/left/image_raw:=/zed2/zed_node/left/image_rect_gray --remap camera/right/image_raw:=/zed2/zed_node/right/image_rect_gray
     ```
     - ```--remap``` is used due to ```-r``` being parsed as a switch arg for stereo rectification
-    - if there is some error similar to ```Error: Can't open display: :0```:
+    - if there is some error similar to ```Error: Can't open display: :0``` or ```Failed to open X display```:
         1. Exit the container
         1. ```xhost local:docker```
         1. Re-run the container

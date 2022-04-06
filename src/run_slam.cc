@@ -46,14 +46,14 @@ void tracking(const std::shared_ptr<stella_vslam::config>& cfg, const std::strin
 
     auto& SLAM = ros->SLAM_;
     // startup the SLAM process
-    SLAM.startup();
+    SLAM->startup();
 
     // create a viewer object
     // and pass the frame_publisher and the map_publisher
 #ifdef USE_PANGOLIN_VIEWER
-    pangolin_viewer::viewer viewer(stella_vslam::util::yaml_optional_ref(cfg->yaml_node_, "PangolinViewer"), &SLAM, SLAM.get_frame_publisher(), SLAM.get_map_publisher());
+    pangolin_viewer::viewer viewer(stella_vslam::util::yaml_optional_ref(cfg->yaml_node_, "PangolinViewer"), SLAM.get(), SLAM->get_frame_publisher(), SLAM->get_map_publisher());
 #elif USE_SOCKET_PUBLISHER
-    socket_publisher::publisher publisher(stella_vslam::util::yaml_optional_ref(cfg->yaml_node_, "SocketPublisher"), &SLAM, SLAM.get_frame_publisher(), SLAM.get_map_publisher());
+    socket_publisher::publisher publisher(stella_vslam::util::yaml_optional_ref(cfg->yaml_node_, "SocketPublisher"), SLAM.get(), SLAM->get_frame_publisher(), SLAM->get_map_publisher());
 #endif
 
     // TODO: Pangolin needs to run in the main thread on OSX
@@ -61,9 +61,9 @@ void tracking(const std::shared_ptr<stella_vslam::config>& cfg, const std::strin
 #ifdef USE_PANGOLIN_VIEWER
     std::thread thread([&]() {
         viewer.run();
-        if (SLAM.terminate_is_requested()) {
+        if (SLAM->terminate_is_requested()) {
             // wait until the loop BA is finished
-            while (SLAM.loop_BA_is_running()) {
+            while (SLAM->loop_BA_is_running()) {
                 std::this_thread::sleep_for(std::chrono::microseconds(5000));
             }
             rclcpp::shutdown();
@@ -72,9 +72,9 @@ void tracking(const std::shared_ptr<stella_vslam::config>& cfg, const std::strin
 #elif USE_SOCKET_PUBLISHER
     std::thread thread([&]() {
         publisher.run();
-        if (SLAM.terminate_is_requested()) {
+        if (SLAM->terminate_is_requested()) {
             // wait until the loop BA is finished
-            while (SLAM.loop_BA_is_running()) {
+            while (SLAM->loop_BA_is_running()) {
                 std::this_thread::sleep_for(std::chrono::microseconds(5000));
             }
             rclcpp::shutdown();
@@ -98,13 +98,13 @@ void tracking(const std::shared_ptr<stella_vslam::config>& cfg, const std::strin
 #endif
 
     // shutdown the SLAM process
-    SLAM.shutdown();
+    SLAM->shutdown();
 
     auto& track_times = ros->track_times_;
     if (eval_log) {
         // output the trajectories for evaluation
-        SLAM.save_frame_trajectory("frame_trajectory.txt", "TUM");
-        SLAM.save_keyframe_trajectory("keyframe_trajectory.txt", "TUM");
+        SLAM->save_frame_trajectory("frame_trajectory.txt", "TUM");
+        SLAM->save_keyframe_trajectory("keyframe_trajectory.txt", "TUM");
         // output the tracking times for evaluation
         std::ofstream ofs("track_times.txt", std::ios::out);
         if (ofs.is_open()) {
@@ -117,7 +117,7 @@ void tracking(const std::shared_ptr<stella_vslam::config>& cfg, const std::strin
 
     if (!map_db_path.empty()) {
         // output the map database
-        SLAM.save_map_database(map_db_path);
+        SLAM->save_map_database(map_db_path);
     }
 
     if (track_times.size()) {
@@ -187,7 +187,7 @@ int main(int argc, char* argv[]) {
     }
 
 #ifdef USE_GOOGLE_PERFTOOLS
-    ProfilerStart("slam.prof");
+    ProfilerStart("SLAM->prof");
 #endif
 
     // run tracking
