@@ -29,8 +29,6 @@ system::system(const std::shared_ptr<stella_vslam::config>& cfg, std::shared_ptr
         node_->declare_parameter<std::string>(VOCAB_PARAM, ""),
         node_->declare_parameter<std::string>(MASK_PARAM, "")
     );
-
-    initialize_subs();
 }
 
 void system::init(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& vocab_file_path, const std::string& mask_img_path)
@@ -44,13 +42,25 @@ void system::init(const std::shared_ptr<stella_vslam::config>& cfg, const std::s
     tf_ = std::make_unique<tf2_ros::Buffer>(node_->get_clock());
     transform_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_);
 
+    loadmap_svc_ = node_->create_service<nav2_msgs::srv::LoadMap>(
+        "~/load_map",
+        std::bind(&system::load_map_svc, this, std::placeholders::_1, std::placeholders::_2)
+    );
+    savemap_svc_ = node_->create_service<nav2_msgs::srv::SaveMap>(
+        "~/save_map",
+        std::bind(&system::save_map_svc, this, std::placeholders::_1, std::placeholders::_2)
+    );
+    togglemap_svc_ = node_->create_service<std_srvs::srv::SetBool>(
+        "~/toggle_mapping",
+        std::bind(&system::toggle_mapping_svc, this, std::placeholders::_1, std::placeholders::_2)
+    );
+
     custom_qos_ = rmw_qos_profile_default;
     custom_qos_.depth = 1;
     exec_.add_node(node_);
     init_pose_sub_ = node_->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
         "/initialpose", 1,
-        std::bind(&system::init_pose_callback,
-                  this, std::placeholders::_1));
+        std::bind(&system::init_pose_callback, this, std::placeholders::_1));
     setParams();
 }
 
@@ -215,7 +225,7 @@ void system::load_map_svc(const std::shared_ptr<nav2_msgs::srv::LoadMap::Request
     }
 }
 
-void system::enable_mapping_svc(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+void system::toggle_mapping_svc(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
     std::shared_ptr<std_srvs::srv::SetBool::Response> response)
 {
     try {
@@ -243,7 +253,7 @@ mono::mono(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& 
 mono::mono(const std::shared_ptr<stella_vslam::config>& cfg, std::shared_ptr<rclcpp::Node>& node)
     : system(cfg, node)
 {
-
+    initialize_subs();
 }
 
 void mono::initialize_subs()
@@ -286,6 +296,7 @@ stereo::stereo(const std::shared_ptr<stella_vslam::config>& cfg, std::shared_ptr
     : system(cfg, node)
 {
     rectify_ = node_->declare_parameter<bool>(RECTIFY_STEREO_PARAM, false);
+    initialize_subs();
 }
 
 void stereo::initialize_subs()
@@ -347,7 +358,7 @@ rgbd::rgbd(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& 
 rgbd::rgbd(const std::shared_ptr<stella_vslam::config>& cfg, std::shared_ptr<rclcpp::Node>& node)
     : system(cfg, node)
 {
-
+    initialize_subs();
 }
 
 void rgbd::initialize_subs()

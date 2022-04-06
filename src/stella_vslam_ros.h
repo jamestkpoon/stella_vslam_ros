@@ -52,6 +52,9 @@ public:
     std::shared_ptr<tf2_ros::TransformListener> transform_listener_;
     bool publish_tf_;
     double transform_tolerance_;
+    rclcpp::Service<nav2_msgs::srv::LoadMap>::SharedPtr loadmap_svc_;
+    rclcpp::Service<nav2_msgs::srv::SaveMap>::SharedPtr savemap_svc_;
+    rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr togglemap_svc_;
 
 private:
     void init_pose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg);
@@ -59,7 +62,7 @@ private:
         std::shared_ptr<nav2_msgs::srv::SaveMap::Response> response);
     void load_map_svc(const std::shared_ptr<nav2_msgs::srv::LoadMap::Request> request,
         std::shared_ptr<nav2_msgs::srv::LoadMap::Response> response);
-    void enable_mapping_svc(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+    void toggle_mapping_svc(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
         std::shared_ptr<std_srvs::srv::SetBool::Response> response);
 
     void init(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& vocab_file_path, const std::string& mask_img_path);
