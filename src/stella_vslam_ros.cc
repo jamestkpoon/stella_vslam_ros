@@ -12,8 +12,8 @@
 
 
 #define VOCAB_PARAM "vocab"
-#define RECTIFY_STEREO_PARAM "rectify_stereo"
 #define MASK_PARAM "mask"
+#define RECTIFY_STEREO_PARAM "rectify_stereo"
 
 
 namespace stella_vslam_ros {
@@ -32,8 +32,6 @@ system::system(const std::shared_ptr<stella_vslam::config>& cfg, std::shared_ptr
 
     initialize_subs();
 }
-
-void system::initialize_subs() {}
 
 void system::init(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& vocab_file_path, const std::string& mask_img_path)
 {
@@ -121,6 +119,13 @@ void system::setParams() {
     transform_tolerance_ = node_->declare_parameter("transform_tolerance", transform_tolerance_);
 }
 
+void system::load_map_and_disable_mapping_on_restart(const std::string& path)
+{
+    SLAM_->load_map_database(path);
+    SLAM_->startup(false);
+    SLAM_->disable_mapping_module();
+}
+
 void system::init_pose_callback(
     const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) {
     if (camera_optical_frame_.empty()) {
@@ -190,28 +195,43 @@ void system::init_pose_callback(
 void system::save_map_svc(const std::shared_ptr<nav2_msgs::srv::SaveMap::Request> request,
     std::shared_ptr<nav2_msgs::srv::SaveMap::Response> response)
 {
-    SLAM_->save_map_database(request->map_url);
+    try {
+        SLAM_->save_map_database(request->map_url);
+        response->result = true;
+    } catch(...) {
+        response->result = false;
+    }    
 }
 
 void system::load_map_svc(const std::shared_ptr<nav2_msgs::srv::LoadMap::Request> request,
     std::shared_ptr<nav2_msgs::srv::LoadMap::Response> response)
 {
-    SLAM_->load_map_database(request->map_url);
+    try {
+        SLAM_->shutdown();
+        load_map_and_disable_mapping_on_restart(request->map_url);
+        response->result = true;
+    } catch(...) {
+        response->result = false;
+    }
 }
 
 void system::enable_mapping_svc(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
     std::shared_ptr<std_srvs::srv::SetBool::Response> response)
 {
-    if (request->data) {
-        SLAM_->enable_mapping_module();
-        response->message = "Mapping module enabled";
-    }
-    else {
-        SLAM_->disable_mapping_module();
-        response->message = "Mapping module disabled";
-    }
+    try {
+        if (request->data) {
+            SLAM_->enable_mapping_module();
+            response->message = "Mapping module enabled";
+        }
+        else {
+            SLAM_->disable_mapping_module();
+            response->message = "Mapping module disabled";
+        }
 
-    response->success = true;
+        response->success = true;
+    } catch(...) {
+        response->success = false;
+    }
 }
 
 
@@ -277,11 +297,11 @@ void stereo::initialize_subs()
     use_exact_time_ = false;
     use_exact_time_ = node_->declare_parameter("use_exact_time", use_exact_time_);
     if (use_exact_time_) {
-        exact_time_sync_ = std::make_shared<ExactTimeSyncPolicy::Sync>(2, *left_sf_.get(), *right_sf_.get());
+        exact_time_sync_ = std::make_shared<ExactTimeSyncPolicy::Sync>(2, *left_sf_, *right_sf_);
         exact_time_sync_->registerCallback(&stereo::callback, this);
     }
     else {
-        approx_time_sync_ = std::make_shared<ApproximateTimeSyncPolicy::Sync>(10, *left_sf_.get(), *right_sf_.get());
+        approx_time_sync_ = std::make_shared<ApproximateTimeSyncPolicy::Sync>(10, *left_sf_, *right_sf_);
         approx_time_sync_->registerCallback(&stereo::callback, this);
     }
 }
@@ -338,11 +358,11 @@ void rgbd::initialize_subs()
     use_exact_time_ = false;
     use_exact_time_ = node_->declare_parameter("use_exact_time", use_exact_time_);
     if (use_exact_time_) {
-        exact_time_sync_ = std::make_shared<ExactTimeSyncPolicy::Sync>(2, *color_sf_.get(), *depth_sf_.get());
+        exact_time_sync_ = std::make_shared<ExactTimeSyncPolicy::Sync>(2, *color_sf_, *depth_sf_);
         exact_time_sync_->registerCallback(&rgbd::callback, this);
     }
     else {
-        approx_time_sync_ = std::make_shared<ApproximateTimeSyncPolicy::Sync>(10, *color_sf_.get(), *depth_sf_.get());
+        approx_time_sync_ = std::make_shared<ApproximateTimeSyncPolicy::Sync>(10, *color_sf_, *depth_sf_);
         approx_time_sync_->registerCallback(&rgbd::callback, this);
     }
 }

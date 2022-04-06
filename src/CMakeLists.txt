@@ -15,6 +15,9 @@ list(APPEND EXECUTABLE_TARGETS run_slam)
 add_executable(run_localization run_localization.cc stella_vslam_ros.cc)
 list(APPEND EXECUTABLE_TARGETS run_localization)
 
+add_executable(vslam_node run_ros.cc stella_vslam_ros.cc)
+list(APPEND EXECUTABLE_TARGETS vslam_node)
+
 foreach(EXECUTABLE_TARGET IN LISTS EXECUTABLE_TARGETS)
     # pangolin_viewer is used on a priority basis
     if(USE_PANGOLIN_VIEWER)
