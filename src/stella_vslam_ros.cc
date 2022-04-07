@@ -61,6 +61,9 @@ void system::init(const std::shared_ptr<stella_vslam::config>& cfg, const std::s
     init_pose_sub_ = node_->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
         "/initialpose", 1,
         std::bind(&system::init_pose_callback, this, std::placeholders::_1));
+    init_pose_direct_sub_ = node_->create_subscription<geometry_msgs::msg::Transform>(
+        "/initialpose_direct", 1,
+        std::bind(&system::init_pose_direct_callback, this, std::placeholders::_1));
     setParams();
 }
 
@@ -155,11 +158,6 @@ void system::init_pose_callback(
         msg->pose.pose.orientation.z);
     Eigen::Affine3d initialpose_affine(trans * rot_q);
 
-    Eigen::Matrix3d rot_cv_to_ros_map_frame;
-    rot_cv_to_ros_map_frame << 0, -1, 0,
-        0, 0, -1,
-        1, 0, 0;
-
     Eigen::Affine3d map_to_initialpose_frame_affine;
     try {
         auto map_to_initialpose_frame = tf_->lookupTransform(
@@ -192,14 +190,35 @@ void system::init_pose_callback(
     //   base_link_to_camera_affine: T(base_link -> camera_link)
     // The flow of the transformation is as follows:
     //   map_cv -> map -> `msg->header.frame_id` -> base_link -> camera_link
-    Eigen::Matrix4d cam_pose_cv = (rot_cv_to_ros_map_frame * map_to_initialpose_frame_affine
-                                   * initialpose_affine * base_link_to_camera_affine)
-                                      .matrix();
 
+    init_pose(
+        map_to_initialpose_frame_affine
+            * initialpose_affine * base_link_to_camera_affine
+    );
+}
+
+void system::init_pose_direct_callback(const geometry_msgs::msg::Transform::SharedPtr msg) {
+    init_pose(tf2::transformToEigen(*msg));
+}
+
+bool system::init_pose(const Eigen::Affine3d& cam_pose) {
+    Eigen::Matrix3d rot_cv_to_ros_map_frame;
+    rot_cv_to_ros_map_frame << 0, -1, 0,
+        0, 0, -1,
+        1, 0, 0;
+
+    Eigen::Matrix4d cam_pose_cv = (rot_cv_to_ros_map_frame * cam_pose).matrix();
     const Eigen::Vector3d normal_vector = (Eigen::Vector3d() << 0., 1., 0.).finished();
-    if (!SLAM_->relocalize_by_pose_2d(cam_pose_cv, normal_vector)) {
-        RCLCPP_ERROR(node_->get_logger(), "Can not set initial pose");
+
+    bool res = SLAM_->relocalize_by_pose_2d(cam_pose_cv, normal_vector);
+
+    if(res) {
+        RCLCPP_INFO(node_->get_logger(), "Initial pose set");
+    } else {
+        RCLCPP_ERROR(node_->get_logger(), "Failed to set initial pose");
     }
+
+    return res;
 }
 
 void system::save_map_svc(const std::shared_ptr<nav2_msgs::srv::SaveMap::Request> request,
@@ -210,7 +229,7 @@ void system::save_map_svc(const std::shared_ptr<nav2_msgs::srv::SaveMap::Request
         response->result = true;
     } catch(...) {
         response->result = false;
-    }    
+    }
 }
 
 void system::load_map_svc(const std::shared_ptr<nav2_msgs::srv::LoadMap::Request> request,

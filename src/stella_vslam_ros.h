@@ -22,6 +22,7 @@
 #include <opencv2/core/core.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
+#include <geometry_msgs/msg/transform.hpp>
 
 #include <nav2_msgs/srv/load_map.hpp>
 #include <nav2_msgs/srv/save_map.hpp>
@@ -45,6 +46,8 @@ public:
     std::shared_ptr<rclcpp::Publisher<nav_msgs::msg::Odometry>> pose_pub_;
     std::shared_ptr<rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>>
         init_pose_sub_;
+    std::shared_ptr<rclcpp::Subscription<geometry_msgs::msg::Transform>>
+        init_pose_direct_sub_;
     std::shared_ptr<tf2_ros::TransformBroadcaster> map_to_odom_broadcaster_;
     std::string odom_frame_, map_frame_, base_link_;
     std::string camera_frame_, camera_optical_frame_;
@@ -58,6 +61,8 @@ public:
 
 private:
     void init_pose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg);
+    void init_pose_direct_callback(const geometry_msgs::msg::Transform::SharedPtr msg);
+    bool init_pose(const Eigen::Affine3d& cam_pose);
     void save_map_svc(const std::shared_ptr<nav2_msgs::srv::SaveMap::Request> request,
         std::shared_ptr<nav2_msgs::srv::SaveMap::Response> response);
     void load_map_svc(const std::shared_ptr<nav2_msgs::srv::LoadMap::Request> request,
