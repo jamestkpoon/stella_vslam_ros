@@ -36,6 +36,7 @@ public:
     void publish_pose(const Eigen::Matrix4d& cam_pose_wc, const rclcpp::Time& stamp);
     void setParams();
     void load_map_and_disable_mapping_on_restart(const std::string& path);
+    void init_pose_direct_callback(const geometry_msgs::msg::Transform::SharedPtr msg);
     std::shared_ptr<stella_vslam::system> SLAM_;
     std::shared_ptr<stella_vslam::config> cfg_;
     std::shared_ptr<rclcpp::Node> node_;
@@ -61,7 +62,6 @@ public:
 
 private:
     void init_pose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg);
-    void init_pose_direct_callback(const geometry_msgs::msg::Transform::SharedPtr msg);
     bool init_pose(const Eigen::Affine3d& cam_pose);
     void save_map_svc(const std::shared_ptr<nav2_msgs::srv::SaveMap::Request> request,
         std::shared_ptr<nav2_msgs::srv::SaveMap::Response> response);
