@@ -1,8 +1,6 @@
 #include <stella_vslam/config.h>
 #include <stella_vslam/system.h>
 #include <stella_vslam_ros.h>
-
-#include <fstream>
 #include <yaml-cpp/yaml.h>
 
 

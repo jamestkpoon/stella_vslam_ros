@@ -51,7 +51,7 @@ void system::init(const std::shared_ptr<stella_vslam::config>& cfg, const std::s
         std::bind(&system::save_map_svc, this, std::placeholders::_1, std::placeholders::_2)
     );
     togglemap_svc_ = node_->create_service<std_srvs::srv::SetBool>(
-        "~/toggle_mapping",
+        "~/enable_mapping",
         std::bind(&system::toggle_mapping_svc, this, std::placeholders::_1, std::placeholders::_2)
     );
 

@@ -22,6 +22,20 @@
         1. ```xhost local:docker```
         1. Re-run the container
 
+## vslam_node
+### Added parameters
+- ```config```: path to a config file, e.g. config/zed2.yaml
+- ```vocab```: path to a vocab file
+- ```rectify_stereo``` (default: false): rectify inbound stereo image pairs
+- ```map```: loads a map file for localization if not empty
+- ```initial_cam_pose```: path to a .yaml of a geometry_msgs/msg/Transform that specifies an initial camera pose in the mapping reference frame. Used to initialize camera pose if not empty
+
+### Added services
+- ```load_map```: load a map file
+- ```save_map```: save a map file
+- ```enable_mapping```: choose between SLAM (true) and localization only (false)
+
+
 
 # stella_vslam_ros
 
