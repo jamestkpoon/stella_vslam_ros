@@ -1,35 +1,16 @@
 #include <stella_vslam/config.h>
 #include <stella_vslam/system.h>
 #include <stella_vslam_ros.h>
-#include <yaml-cpp/yaml.h>
 
 
 #define CONFIG_PARAM "config"
 #define INITIAL_MAP_PARAM "map"
-#define INITIAL_POSE_PARAM "initial_cam_pose"
-
-
-geometry_msgs::msg::Transform transform_msg_from_yaml(const std::string& filepath) {
-    auto yaml = YAML::LoadFile(filepath);
-
-    geometry_msgs::msg::Transform msg;
-    msg.translation.x = yaml["translation"]["x"].as<double>();
-    msg.translation.y = yaml["translation"]["y"].as<double>();
-    msg.translation.z = yaml["translation"]["z"].as<double>();
-    msg.rotation.x = yaml["rotation"]["x"].as<double>();
-    msg.rotation.y = yaml["rotation"]["y"].as<double>();
-    msg.rotation.z = yaml["rotation"]["z"].as<double>();
-    msg.rotation.w = yaml["rotation"]["w"].as<double>();
-
-    return msg;
-}
 
 
 int main(int argc, char* argv[]) {
     rclcpp::init(argc, argv);
 
     auto node = std::make_shared<rclcpp::Node>("vslam");
-    auto logger = node->get_logger();
     auto cfg = std::make_shared<stella_vslam::config>(
         node->declare_parameter<std::string>(CONFIG_PARAM, "")
     );
@@ -46,26 +27,17 @@ int main(int argc, char* argv[]) {
     }
     else {
         auto error_str = "Invalid input type: " + cfg->camera_->get_setup_type_string();
-        RCLCPP_ERROR(logger, error_str.c_str());
+        RCLCPP_ERROR(node->get_logger(), error_str.c_str());
         return EXIT_FAILURE;
     }
 
-    auto slam = ros->SLAM_;
     auto initial_map = node->declare_parameter<std::string>(INITIAL_MAP_PARAM, "");
     if(initial_map != "") {
         ros->load_map_and_disable_mapping_on_restart(initial_map);
     } else {
-        slam->startup();
-        slam->enable_mapping_module();
-    }
-
-    auto initial_cam_pose_fp = node->declare_parameter<std::string>(INITIAL_POSE_PARAM, "");
-    if(initial_cam_pose_fp != "") {
-        ros->init_pose_direct_callback(
-            std::make_shared<geometry_msgs::msg::Transform>(
-                transform_msg_from_yaml(initial_cam_pose_fp)
-            )
-        );
+        ros->set_slam_frame_transform_from_lookup();
+        ros->SLAM_->startup();
+        ros->SLAM_->enable_mapping_module();
     }
 
     rclcpp::Rate rate(50);
@@ -74,7 +46,7 @@ int main(int argc, char* argv[]) {
         rate.sleep();
     }
 
-    slam->shutdown();
+    ros->SLAM_->shutdown();
     rclcpp::shutdown();
 
     return EXIT_SUCCESS;

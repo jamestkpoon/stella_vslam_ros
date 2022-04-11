@@ -28,7 +28,6 @@
 - ```vocab```: path to a vocab file
 - ```rectify_stereo``` (default: false): rectify inbound stereo image pairs
 - ```map```: loads a map file for localization if not empty
-- ```initial_cam_pose```: path to a .yaml of a geometry_msgs/msg/Transform that specifies an initial camera pose in the mapping reference frame. Used to initialize camera pose if not empty
 
 ### Added services
 - ```load_map```: load a map file

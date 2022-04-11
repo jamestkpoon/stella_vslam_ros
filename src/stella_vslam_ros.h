@@ -35,8 +35,8 @@ public:
     system(const std::shared_ptr<stella_vslam::config>& cfg, std::shared_ptr<rclcpp::Node>& node);
     void publish_pose(const Eigen::Matrix4d& cam_pose_wc, const rclcpp::Time& stamp);
     void setParams();
-    void load_map_and_disable_mapping_on_restart(const std::string& path);
-    void init_pose_direct_callback(const geometry_msgs::msg::Transform::SharedPtr msg);
+    void load_map_and_disable_mapping_on_restart(const std::string& filepath);
+    void set_slam_frame_transform_from_lookup();
     std::shared_ptr<stella_vslam::system> SLAM_;
     std::shared_ptr<stella_vslam::config> cfg_;
     std::shared_ptr<rclcpp::Node> node_;
@@ -47,8 +47,6 @@ public:
     std::shared_ptr<rclcpp::Publisher<nav_msgs::msg::Odometry>> pose_pub_;
     std::shared_ptr<rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>>
         init_pose_sub_;
-    std::shared_ptr<rclcpp::Subscription<geometry_msgs::msg::Transform>>
-        init_pose_direct_sub_;
     std::shared_ptr<tf2_ros::TransformBroadcaster> map_to_odom_broadcaster_;
     std::string odom_frame_, map_frame_, base_link_;
     std::string camera_frame_, camera_optical_frame_;
@@ -59,6 +57,7 @@ public:
     rclcpp::Service<nav2_msgs::srv::LoadMap>::SharedPtr loadmap_svc_;
     rclcpp::Service<nav2_msgs::srv::SaveMap>::SharedPtr savemap_svc_;
     rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr togglemap_svc_;
+    Eigen::Affine3d slam_frame_transform_;
 
 private:
     void init_pose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg);
@@ -71,6 +70,7 @@ private:
         std::shared_ptr<std_srvs::srv::SetBool::Response> response);
 
     void init(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& vocab_file_path, const std::string& mask_img_path);
+    void set_slam_frame_transform(const geometry_msgs::msg::Transform& transform);
 
 protected:
     virtual void initialize_subs() { RCLCPP_ERROR(node_->get_logger(), "No subs to initialize"); }

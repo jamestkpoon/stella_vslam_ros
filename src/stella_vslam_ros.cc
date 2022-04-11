@@ -2,6 +2,10 @@
 #include <stella_vslam/publish/map_publisher.h>
 
 #include <chrono>
+#include <filesystem>
+#include <iostream>
+#include <fstream>
+#include <yaml-cpp/yaml.h>
 
 #include <tf2_eigen/tf2_eigen.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
@@ -14,6 +18,9 @@
 #define VOCAB_PARAM "vocab"
 #define MASK_PARAM "mask"
 #define RECTIFY_STEREO_PARAM "rectify_stereo"
+
+#define SLAM_FRAME_LOOKUP_TIMEOUT 5.0
+#define MESSAGEPACK_EXT ".msg"
 
 
 namespace stella_vslam_ros {
@@ -61,9 +68,6 @@ void system::init(const std::shared_ptr<stella_vslam::config>& cfg, const std::s
     init_pose_sub_ = node_->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
         "/initialpose", 1,
         std::bind(&system::init_pose_callback, this, std::placeholders::_1));
-    init_pose_direct_sub_ = node_->create_subscription<geometry_msgs::msg::Transform>(
-        "/initialpose_direct", 1,
-        std::bind(&system::init_pose_direct_callback, this, std::placeholders::_1));
     setParams();
 }
 
@@ -81,12 +85,15 @@ void system::publish_pose(const Eigen::Matrix4d& cam_pose_wc, const rclcpp::Time
     // Transform map frame from CV coordinate system to ROS coordinate system
     map_to_camera_affine.prerotate(rot_ros_to_cv_map_frame);
 
+    // apply slam_frame_transform_ for the "real" map frame
+    map_to_camera_affine = slam_frame_transform_ * (map_to_camera_affine * rot_ros_to_cv_map_frame.inverse());
+
     // Create odometry message and update it with current camera pose
     nav_msgs::msg::Odometry pose_msg;
     pose_msg.header.stamp = stamp;
     pose_msg.header.frame_id = map_frame_;
     pose_msg.child_frame_id = camera_frame_;
-    pose_msg.pose.pose = tf2::toMsg(map_to_camera_affine * rot_ros_to_cv_map_frame.inverse());
+    pose_msg.pose.pose = tf2::toMsg(map_to_camera_affine);
     pose_pub_->publish(pose_msg);
 
     // Send map->odom transform. Set publish_tf to false if not using TF
@@ -132,9 +139,23 @@ void system::setParams() {
     transform_tolerance_ = node_->declare_parameter("transform_tolerance", transform_tolerance_);
 }
 
-void system::load_map_and_disable_mapping_on_restart(const std::string& path)
+void system::load_map_and_disable_mapping_on_restart(const std::string& filepath)
 {
-    SLAM_->load_map_database(path);
+    auto yaml = YAML::LoadFile(filepath);
+
+    auto map_db = std::filesystem::path(filepath).parent_path() / yaml["map_db"].as<std::string>();
+
+    geometry_msgs::msg::Transform transform;
+    transform.translation.x = yaml["transform"]["translation"]["x"].as<double>();
+    transform.translation.y = yaml["transform"]["translation"]["y"].as<double>();
+    transform.translation.z = yaml["transform"]["translation"]["z"].as<double>();
+    transform.rotation.x = yaml["translation"]["rotation"]["x"].as<double>();
+    transform.rotation.y = yaml["translation"]["rotation"]["y"].as<double>();
+    transform.rotation.z = yaml["translation"]["rotation"]["z"].as<double>();
+    transform.rotation.w = yaml["translation"]["rotation"]["w"].as<double>();
+
+    SLAM_->load_map_database(map_db.string());
+    set_slam_frame_transform(transform);
     SLAM_->startup(false);
     SLAM_->disable_mapping_module();
 }
@@ -197,10 +218,6 @@ void system::init_pose_callback(
     );
 }
 
-void system::init_pose_direct_callback(const geometry_msgs::msg::Transform::SharedPtr msg) {
-    init_pose(tf2::transformToEigen(*msg));
-}
-
 bool system::init_pose(const Eigen::Affine3d& cam_pose) {
     Eigen::Matrix3d rot_cv_to_ros_map_frame;
     rot_cv_to_ros_map_frame << 0, -1, 0,
@@ -225,7 +242,25 @@ void system::save_map_svc(const std::shared_ptr<nav2_msgs::srv::SaveMap::Request
     std::shared_ptr<nav2_msgs::srv::SaveMap::Response> response)
 {
     try {
-        SLAM_->save_map_database(request->map_url);
+        SLAM_->save_map_database(request->map_url + MESSAGEPACK_EXT);
+
+        std::ofstream yaml; yaml.open(request->map_url + ".yaml");
+        auto stem = std::filesystem::path(request->map_url).stem().string();
+        auto map_db_local_filepath = stem + MESSAGEPACK_EXT;
+        auto transform = tf2::eigenToTransform(slam_frame_transform_).transform;
+        yaml << "map_db: " << map_db_local_filepath << "\n";
+        yaml << "transform:\n";
+        yaml << "  translation:\n";
+        yaml << "    x: " << std::to_string(transform.translation.x) << "\n";
+        yaml << "    y: " << std::to_string(transform.translation.y) << "\n";
+        yaml << "    z: " << std::to_string(transform.translation.z) << "\n";
+        yaml << "  rotation:\n";
+        yaml << "    x: " << std::to_string(transform.rotation.x) << "\n";
+        yaml << "    y: " << std::to_string(transform.rotation.y) << "\n";
+        yaml << "    z: " << std::to_string(transform.rotation.z) << "\n";
+        yaml << "    w: " << std::to_string(transform.rotation.w) << "\n";
+        yaml.close();        
+
         response->result = true;
     } catch(...) {
         response->result = false;
@@ -261,6 +296,31 @@ void system::toggle_mapping_svc(const std::shared_ptr<std_srvs::srv::SetBool::Re
     } catch(...) {
         response->success = false;
     }
+}
+
+void system::set_slam_frame_transform(const geometry_msgs::msg::Transform& transform) {
+    slam_frame_transform_ = tf2::transformToEigen(transform).inverse();
+}
+
+void system::set_slam_frame_transform_from_lookup() {
+    geometry_msgs::msg::Transform transform;
+
+    try {
+        auto map_to_camera_stf = tf_->lookupTransform(
+            map_frame_, camera_optical_frame_, tf2::TimePointZero,
+            tf2::durationFromSec(SLAM_FRAME_LOOKUP_TIMEOUT));
+        transform = map_to_camera_stf.transform;
+    }
+    catch (tf2::TransformException& ex) {
+        RCLCPP_ERROR(node_->get_logger(), ex.what());
+
+        transform.translation.x = transform.translation.y = transform.translation.z = 0.0;
+        transform.rotation.x = transform.rotation.y = transform.rotation.z = 0.0;
+        transform.rotation.w = 1.0;
+        RCLCPP_WARN(node_->get_logger(), "SLAM frame is identity");
+    }
+
+    set_slam_frame_transform(transform);
 }
 
 
