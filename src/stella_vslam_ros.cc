@@ -299,7 +299,7 @@ void system::toggle_mapping_svc(const std::shared_ptr<std_srvs::srv::SetBool::Re
 }
 
 void system::set_slam_frame_transform(const geometry_msgs::msg::Transform& transform) {
-    slam_frame_transform_ = tf2::transformToEigen(transform).inverse();
+    slam_frame_transform_ = tf2::transformToEigen(transform);
 }
 
 void system::set_slam_frame_transform_from_lookup() {
