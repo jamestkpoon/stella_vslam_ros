@@ -192,6 +192,8 @@ void system::init_pose_callback(
         return;
     }
 
+    map_to_initialpose_frame_affine = slam_frame_transform_.inverse() * map_to_initialpose_frame_affine;
+
     Eigen::Affine3d base_link_to_camera_affine;
     try {
         auto base_link_to_camera = tf_->lookupTransform(
