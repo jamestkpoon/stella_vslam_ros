@@ -144,20 +144,19 @@ void system::load_map_and_disable_mapping_on_restart(const std::string& filepath
     auto yaml = YAML::LoadFile(filepath);
 
     auto map_db = std::filesystem::path(filepath).parent_path() / yaml["map_db"].as<std::string>();
+    SLAM_->load_map_database(map_db.string());
+    SLAM_->startup(false);
+    SLAM_->disable_mapping_module();
 
     geometry_msgs::msg::Transform transform;
     transform.translation.x = yaml["transform"]["translation"]["x"].as<double>();
     transform.translation.y = yaml["transform"]["translation"]["y"].as<double>();
     transform.translation.z = yaml["transform"]["translation"]["z"].as<double>();
-    transform.rotation.x = yaml["translation"]["rotation"]["x"].as<double>();
-    transform.rotation.y = yaml["translation"]["rotation"]["y"].as<double>();
-    transform.rotation.z = yaml["translation"]["rotation"]["z"].as<double>();
-    transform.rotation.w = yaml["translation"]["rotation"]["w"].as<double>();
-
-    SLAM_->load_map_database(map_db.string());
+    transform.rotation.x = yaml["transform"]["rotation"]["x"].as<double>();
+    transform.rotation.y = yaml["transform"]["rotation"]["y"].as<double>();
+    transform.rotation.z = yaml["transform"]["rotation"]["z"].as<double>();
+    transform.rotation.w = yaml["transform"]["rotation"]["w"].as<double>();
     set_slam_frame_transform(transform);
-    SLAM_->startup(false);
-    SLAM_->disable_mapping_module();
 }
 
 void system::init_pose_callback(
@@ -186,13 +185,12 @@ void system::init_pose_callback(
             tf2::durationFromSec(0.0));
         map_to_initialpose_frame_affine = tf2::transformToEigen(
             map_to_initialpose_frame.transform);
+        map_to_initialpose_frame_affine = slam_frame_transform_.inverse() * map_to_initialpose_frame_affine;
     }
     catch (tf2::TransformException& ex) {
         RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000, "Transform failed: " << ex.what());
         return;
     }
-
-    map_to_initialpose_frame_affine = slam_frame_transform_.inverse() * map_to_initialpose_frame_affine;
 
     Eigen::Affine3d base_link_to_camera_affine;
     try {
@@ -319,7 +317,7 @@ void system::set_slam_frame_transform_from_lookup() {
         transform.translation.x = transform.translation.y = transform.translation.z = 0.0;
         transform.rotation.x = transform.rotation.y = transform.rotation.z = 0.0;
         transform.rotation.w = 1.0;
-        RCLCPP_WARN(node_->get_logger(), "SLAM frame is identity");
+        RCLCPP_WARN(node_->get_logger(), "SLAM frame transform is identity");
     }
 
     set_slam_frame_transform(transform);
