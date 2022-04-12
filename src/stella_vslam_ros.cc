@@ -166,16 +166,7 @@ void system::init_pose_callback(
         return;
     }
 
-    Eigen::Translation3d trans(
-        msg->transform.translation.x,
-        msg->transform.translation.y,
-        msg->transform.translation.z);
-    Eigen::Quaterniond rot_q(
-        msg->transform.rotation.w,
-        msg->transform.rotation.x,
-        msg->transform.rotation.y,
-        msg->transform.rotation.z);
-    Eigen::Affine3d initialpose_affine(trans * rot_q);
+    Eigen::Affine3d initialpose_affine = tf2::transformToEigen(msg->transform);
 
     Eigen::Affine3d map_to_initialpose_frame_affine;
     try {
