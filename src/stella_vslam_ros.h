@@ -21,7 +21,7 @@
 
 #include <opencv2/core/core.hpp>
 #include <sensor_msgs/msg/image.hpp>
-#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
+#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/transform.hpp>
 
 #include <nav2_msgs/srv/load_map.hpp>
@@ -45,7 +45,7 @@ public:
     cv::Mat mask_;
     std::vector<double> track_times_;
     std::shared_ptr<rclcpp::Publisher<nav_msgs::msg::Odometry>> pose_pub_;
-    std::shared_ptr<rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>>
+    std::shared_ptr<rclcpp::Subscription<geometry_msgs::msg::TransformStamped>>
         init_pose_sub_;
     std::shared_ptr<tf2_ros::TransformBroadcaster> map_to_odom_broadcaster_;
     std::string odom_frame_, map_frame_, base_link_;
@@ -60,7 +60,7 @@ public:
     Eigen::Affine3d slam_frame_transform_;
 
 private:
-    void init_pose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg);
+    void init_pose_callback(const geometry_msgs::msg::TransformStamped::SharedPtr msg);
     bool init_pose(const Eigen::Affine3d& cam_pose);
     void save_map_svc(const std::shared_ptr<nav2_msgs::srv::SaveMap::Request> request,
         std::shared_ptr<nav2_msgs::srv::SaveMap::Response> response);

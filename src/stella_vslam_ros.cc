@@ -9,7 +9,6 @@
 
 #include <tf2_eigen/tf2_eigen.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <geometry_msgs/msg/transform_stamped.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <Eigen/Geometry>
@@ -65,8 +64,8 @@ void system::init(const std::shared_ptr<stella_vslam::config>& cfg, const std::s
     custom_qos_ = rmw_qos_profile_default;
     custom_qos_.depth = 1;
     exec_.add_node(node_);
-    init_pose_sub_ = node_->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
-        "/initialpose", 1,
+    init_pose_sub_ = node_->create_subscription<geometry_msgs::msg::TransformStamped>(
+        "~/initial_pose", 1,
         std::bind(&system::init_pose_callback, this, std::placeholders::_1));
     setParams();
 }
@@ -160,7 +159,7 @@ void system::load_map_and_disable_mapping_on_restart(const std::string& filepath
 }
 
 void system::init_pose_callback(
-    const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) {
+    const geometry_msgs::msg::TransformStamped::SharedPtr msg) {
     if (camera_optical_frame_.empty()) {
         RCLCPP_ERROR(node_->get_logger(),
                      "Camera link is not set: no images were received yet");
@@ -168,14 +167,14 @@ void system::init_pose_callback(
     }
 
     Eigen::Translation3d trans(
-        msg->pose.pose.position.x,
-        msg->pose.pose.position.y,
-        msg->pose.pose.position.z);
+        msg->transform.translation.x,
+        msg->transform.translation.y,
+        msg->transform.translation.z);
     Eigen::Quaterniond rot_q(
-        msg->pose.pose.orientation.w,
-        msg->pose.pose.orientation.x,
-        msg->pose.pose.orientation.y,
-        msg->pose.pose.orientation.z);
+        msg->transform.rotation.w,
+        msg->transform.rotation.x,
+        msg->transform.rotation.y,
+        msg->transform.rotation.z);
     Eigen::Affine3d initialpose_affine(trans * rot_q);
 
     Eigen::Affine3d map_to_initialpose_frame_affine;
@@ -192,29 +191,21 @@ void system::init_pose_callback(
         return;
     }
 
-    Eigen::Affine3d base_link_to_camera_affine;
+    Eigen::Affine3d initialpose_child_frame_to_camera_affine;
     try {
-        auto base_link_to_camera = tf_->lookupTransform(
-            base_link_, camera_optical_frame_, tf2_ros::fromMsg(msg->header.stamp),
+        auto initialpose_child_frame_to_camera = tf_->lookupTransform(
+            msg->child_frame_id, camera_optical_frame_, tf2_ros::fromMsg(msg->header.stamp),
             tf2::durationFromSec(0.0));
-        base_link_to_camera_affine = tf2::transformToEigen(base_link_to_camera.transform);
+        initialpose_child_frame_to_camera_affine = tf2::transformToEigen(initialpose_child_frame_to_camera.transform);
     }
     catch (tf2::TransformException& ex) {
         RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000, "Transform failed: " << ex.what());
         return;
     }
 
-    // Target transform is map_cv -> camera_link and known parameters are following:
-    //   rot_cv_to_ros_map_frame: T(map_cv -> map)
-    //   map_to_initialpose_frame_affine: T(map -> `msg->header.frame_id`)
-    //   initialpose_affine: T(`msg->header.frame_id` -> base_link)
-    //   base_link_to_camera_affine: T(base_link -> camera_link)
-    // The flow of the transformation is as follows:
-    //   map_cv -> map -> `msg->header.frame_id` -> base_link -> camera_link
-
     init_pose(
-        map_to_initialpose_frame_affine
-            * initialpose_affine * base_link_to_camera_affine
+        // map -> initialpose frame_id -> initialpose child_frame_id -> camera
+        map_to_initialpose_frame_affine * initialpose_affine * initialpose_child_frame_to_camera_affine
     );
 }
 
