@@ -85,14 +85,14 @@ void system::publish_pose(const Eigen::Matrix4d& cam_pose_wc, const rclcpp::Time
     map_to_camera_affine.prerotate(rot_ros_to_cv_map_frame);
 
     // apply slam_frame_transform_ for the "real" map frame
-    map_to_camera_affine = slam_frame_transform_ * (map_to_camera_affine * rot_ros_to_cv_map_frame.inverse());
+    map_to_camera_affine = slam_frame_transform_ * map_to_camera_affine;
 
     // Create odometry message and update it with current camera pose
     nav_msgs::msg::Odometry pose_msg;
     pose_msg.header.stamp = stamp;
     pose_msg.header.frame_id = map_frame_;
     pose_msg.child_frame_id = camera_frame_;
-    pose_msg.pose.pose = tf2::toMsg(map_to_camera_affine);
+    pose_msg.pose.pose = tf2::toMsg(map_to_camera_affine * rot_ros_to_cv_map_frame.inverse());
     pose_pub_->publish(pose_msg);
 
     // Send map->odom transform. Set publish_tf to false if not using TF
@@ -289,7 +289,7 @@ void system::set_slam_frame_transform_from_lookup() {
 
     try {
         auto map_to_camera_stf = tf_->lookupTransform(
-            map_frame_, camera_optical_frame_, tf2::TimePointZero,
+            map_frame_, camera_frame_, tf2::TimePointZero,
             tf2::durationFromSec(SLAM_FRAME_LOOKUP_TIMEOUT));
         transform = map_to_camera_stf.transform;
     }

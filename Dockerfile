@@ -123,6 +123,7 @@ RUN set -x && \
   apt-get install -y -qq \
     ros-${ROS_DISTRO}-image-transport \
     ros-${ROS_DISTRO}-cv-bridge \
+    ros-${ROS_DISTRO}-rmw-fastrtps-cpp \
     python3-pip \
     python3-colcon-common-extensions && \
   pip3 install -U \
@@ -157,6 +158,8 @@ RUN set -x && wget -q https://github.com/stella-cv/FBoW_orb_vocab/blob/main/orb_
 
 ENV CONFIG_PATH=/vslam_config
 COPY ./config ${CONFIG_PATH}
+
+ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 
 # env
 RUN set -x && \
