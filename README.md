@@ -9,10 +9,12 @@
     - config/ is copied to ```CONFIG_PATH```
 1. 
     ```
-    docker run -it -m 8g -v /tmp/.X11-unix/:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY vslam:0.0.1
+    docker run -it -m 8g vslam:0.0.1
     ```
+    - if using fastRTPS (default), you may need ```-v /dev/shm:/dev/shm``` and/or ```--pid=host```
+    - if you require X11, include ```-v /tmp/.X11-unix/:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY```
     - to bind mount this repository, include ```-v $(pwd):/ros2_ws/src/stella_vslam_ros```
-    - to re-build with this bind mount: ```colcon build --packages-select stella_vslam_ros```
+        - to re-build with this bind mount: ```colcon build --packages-select stella_vslam_ros```
 1. ZED2 stereo:
     ```
     ros2 run stella_vslam_ros vslam_node --ros-args -p vocab:=$VOCAB_FILE_PATH -p config:=$CONFIG_PATH/zed2.yaml -p publish_tf:=false -p camera_frame:=zed2_left_camera_frame -r camera/left/image_raw:=/zed2/zed_node/left/image_rect_gray -r camera/right/image_raw:=/zed2/zed_node/right/image_rect_gray
