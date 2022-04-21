@@ -161,6 +161,11 @@ COPY ./config ${CONFIG_PATH}
 
 ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 
+# override default log dir
+ENV ROS_LOG_DIR /ros_logs
+RUN mkdir ${ROS_LOG_DIR}
+RUN chmod 777 ${ROS_LOG_DIR}
+
 # env
 RUN set -x && \
   sh -c "echo '#'\!'/bin/bash\nset -e\nsource /opt/ros/${ROS_DISTRO}/setup.bash\nsource /ros2_ws/install/setup.bash\nexec \"\$@\"' > /ros_entrypoint.sh" && \
