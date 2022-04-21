@@ -9,9 +9,8 @@
     - config/ is copied to ```CONFIG_PATH```
 1. 
     ```
-    docker run -it -m 8g vslam:0.0.1
+    docker run --rm -it -m 8g -u $(id -u):$(id -g) --net=host -v /dev/shm:/dev/shm -e ROS_DOMAIN_ID=$ROS_DOMAIN_ID vslam:0.0.1
     ```
-    - if using fastRTPS (default), you may need ```-v /dev/shm:/dev/shm``` and/or ```--pid=host```
     - if you require X11, include ```-v /tmp/.X11-unix/:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY```
     - to bind mount this repository, include ```-v $(pwd):/ros2_ws/src/stella_vslam_ros```
         - to re-build with this bind mount: ```colcon build --packages-select stella_vslam_ros```
