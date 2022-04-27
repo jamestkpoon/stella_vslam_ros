@@ -35,7 +35,6 @@ int main(int argc, char* argv[]) {
     if(initial_map != "") {
         ros->load_map_and_disable_mapping_on_restart(initial_map);
     } else {
-        ros->set_slam_frame_transform_from_lookup();
         ros->SLAM_->startup();
         ros->SLAM_->enable_mapping_module();
     }

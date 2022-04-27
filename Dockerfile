@@ -110,6 +110,7 @@ RUN set -x && \
     -DUSE_SOCKET_PUBLISHER=OFF \
     -DINSTALL_PANGOLIN_VIEWER=ON \
     -DUSE_STACK_TRACE_LOGGER=ON \
+    -DCMAKE_BUILD_TYPE=Release \
     .. && \
   make -j${NUM_THREADS} && \
   make install && \
@@ -148,7 +149,8 @@ RUN set -x && \
   colcon build --parallel-workers ${NUM_THREADS} --cmake-args \
     -DUSE_PANGOLIN_VIEWER=ON \
     -DUSE_SOCKET_PUBLISHER=OFF \
-    -DUSE_STACK_TRACE_LOGGER=ON"
+    -DUSE_STACK_TRACE_LOGGER=ON \
+    -DCMAKE_BUILD_TYPE=Release"
     
 RUN rm -rf /ros2_ws/src/*
 

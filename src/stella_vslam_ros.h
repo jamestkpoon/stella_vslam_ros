@@ -36,7 +36,6 @@ public:
     void publish_pose(const Eigen::Matrix4d& cam_pose_wc, const rclcpp::Time& stamp);
     void setParams();
     void load_map_and_disable_mapping_on_restart(const std::string& filepath);
-    void set_slam_frame_transform_from_lookup();
     std::shared_ptr<stella_vslam::system> SLAM_;
     std::shared_ptr<stella_vslam::config> cfg_;
     std::shared_ptr<rclcpp::Node> node_;
@@ -71,6 +70,8 @@ private:
 
     void init(const std::shared_ptr<stella_vslam::config>& cfg, const std::string& vocab_file_path, const std::string& mask_img_path);
     void set_slam_frame_transform(const geometry_msgs::msg::Transform& transform);
+    void to_ros(const Eigen::Matrix4d& cam_pose_wc, Eigen::Affine3d& map_to_camera_affine, Eigen::Affine3d& map_to_camera_ros);
+    void tum_to_ros(const std::string& tum_fp, const std::string& ros_fp);
 
 protected:
     virtual void initialize_subs() { RCLCPP_ERROR(node_->get_logger(), "No subs to initialize"); }

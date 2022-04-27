@@ -14,6 +14,11 @@
     - if you require X11, include ```-v /tmp/.X11-unix/:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY```
     - to bind mount this repository, include ```-v $(pwd):/ros2_ws/src/stella_vslam_ros```
         - to re-build with this bind mount: ```colcon build --packages-select stella_vslam_ros```
+    - example of bind mounting a folder for saving maps:
+        1. ```mkdir maps```
+        1. ```sudo chmod 777 maps```
+        1. include ```-v $(pwd)/maps:/maps```
+        1. ```ros2 service call /vslam/save_map nav2_msgs/srv/SaveMap "{map_url: "/maps/test_map"}"```
 1. ZED2 stereo:
     ```
     ros2 run stella_vslam_ros vslam_node --ros-args -p vocab:=$VOCAB_FILE_PATH -p config:=$CONFIG_PATH/zed2.yaml -p publish_tf:=false -p camera_frame:=zed2_left_camera_frame -r camera/left/image_raw:=/zed2/zed_node/left/image_rect_gray -r camera/right/image_raw:=/zed2/zed_node/right/image_rect_gray
