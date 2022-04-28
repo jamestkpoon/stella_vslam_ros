@@ -390,7 +390,7 @@ void mono::callback(const sensor_msgs::msg::Image::ConstSharedPtr& msg) {
         camera_optical_frame_ = msg->header.frame_id;
     }
     const rclcpp::Time tp_1 = node_->now();
-    const double timestamp = tp_1.seconds();
+    const auto timestamp = rclcpp::Time(msg->header.stamp).seconds();
 
     // input the current frame and estimate the camera pose
     auto cam_pose_wc = SLAM_->feed_monocular_frame(cv_bridge::toCvShare(msg)->image, timestamp, mask_);
@@ -455,7 +455,7 @@ void stereo::callback(const sensor_msgs::msg::Image::ConstSharedPtr& left, const
     }
 
     const rclcpp::Time tp_1 = node_->now();
-    const double timestamp = tp_1.seconds();
+    const auto timestamp = rclcpp::Time(left->header.stamp).seconds();
 
     // input the current frame and estimate the camera pose
     auto cam_pose_wc = SLAM_->feed_stereo_frame(leftcv, rightcv, timestamp, mask_);
@@ -515,7 +515,7 @@ void rgbd::callback(const sensor_msgs::msg::Image::ConstSharedPtr& color, const 
     }
 
     const rclcpp::Time tp_1 = node_->now();
-    const double timestamp = tp_1.seconds();
+    const auto timestamp = rclcpp::Time(color->header.stamp).seconds();
 
     // input the current frame and estimate the camera pose
     auto cam_pose_wc = SLAM_->feed_RGBD_frame(colorcv, depthcv, timestamp, mask_);
