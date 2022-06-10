@@ -9,7 +9,7 @@
     - config/ is copied to ```CONFIG_PATH```
 1. 
     ```
-    docker run --rm -it -m 8g -u $(id -u):$(id -g) --net=host -v /dev/shm:/dev/shm -e ROS_DOMAIN_ID=$ROS_DOMAIN_ID vslam:0.0.1
+    docker run --rm -it -m 8g -u $(id -u):$(id -g) --net=host -v /dev/shm:/dev/shm -e ROS_DOMAIN_ID=$ROS_DOMAIN_ID -e RMW_IMPLEMENTATION=$RMW_IMPLEMENTATION vslam:0.0.1
     ```
     - if you require X11, include ```-v /tmp/.X11-unix/:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY```
     - to bind mount this repository, include ```-v $(pwd):/ros2_ws/src/stella_vslam_ros```
