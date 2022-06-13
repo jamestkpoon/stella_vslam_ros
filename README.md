@@ -6,7 +6,7 @@
     docker build -f Dockerfile -t vslam:0.0.1 --build-arg NUM_THREADS=12 .
     ```
     - a [FBoW vocab file](https://github.com/stella-cv/FBoW_orb_vocab/blob/main/orb_vocab.fbow) is saved to ```VOCAB_FILE_PATH```
-    - config/ is copied to ```CONFIG_PATH```
+    - config/ is copied to ```CONFIG_PATH```, which is set to ```/vslam_config```
 1. 
     ```
     docker run --rm -it -m 8g -u $(id -u):$(id -g) --net=host -v /dev/shm:/dev/shm -e ROS_DOMAIN_ID=$ROS_DOMAIN_ID vslam:0.0.1
