@@ -161,8 +161,6 @@ RUN set -x && wget -q https://github.com/stella-cv/FBoW_orb_vocab/blob/main/orb_
 ENV CONFIG_PATH=/vslam_config
 COPY ./config ${CONFIG_PATH}
 
-ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-
 # override default log dir
 ENV ROS_LOG_DIR /ros_logs
 RUN mkdir ${ROS_LOG_DIR}
